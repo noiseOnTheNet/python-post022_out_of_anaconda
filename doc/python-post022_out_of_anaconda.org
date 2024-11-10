@@ -1,9 +1,21 @@
-#+title: Python Post022 Out Of Anaconda
+#+BLOG: noise on the net
+#+POSTID: 539
+#+ORG2BLOG:
+#+DATE: [2024-11-10 dom 17:22]
+#+OPTIONS: toc:nil num:nil todo:nil pri:nil tags:nil ^:nil
+#+CATEGORY: Tools
+#+TAGS: Python
+#+DESCRIPTION: some tips to convert old anaconda based project
+#+title: Escaping from Anaconda
+
+file:david-clode--6f9-eAybjA-unsplash.jpg
 
 Photo by [[https://unsplash.com/@davidclode?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash][David Clode]] on [[https://unsplash.com/photos/brown-snake--6f9-eAybjA?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash][Unsplash]]
 
 Sometime a friendly snake can turn dangerous. Here are some hints to escape from
 Anaconda
+
+The code for this post is available [[https://github.com/noiseOnTheNet/python-post022_out_of_anaconda][here]]
 
 * Disclaimer
 The python code presented below was not developed for my current employer but in
@@ -145,7 +157,7 @@ def read(filename: Union[str,Path]):
         base_dict = load(f, Loader)
         deps = []
         for dep in base_dict['dependencies']:
-            if type(dep) == str:
+        if type(dep) == str:
                 deps.append(parse_conda_dep(dep))
             elif type(dep) == dict:
                 for pip_dep in dep['pip']:
@@ -343,3 +355,5 @@ make sure that the new packages are working correctly.
 
 In future posts I will cover also how to update containers removing conda
 dependencies
+
+# david-clode--6f9-eAybjA-unsplash.jpg https://noiseonthenet.space/noise/wp-content/uploads/2024/11/david-clode-6f9-eAybjA-unsplash.jpg
