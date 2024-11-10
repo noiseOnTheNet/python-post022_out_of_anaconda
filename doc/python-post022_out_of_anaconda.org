@@ -1,4 +1,14 @@
 #+title: Python Post022 Out Of Anaconda
+
+Photo by [[https://unsplash.com/@davidclode?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash][David Clode]] on [[https://unsplash.com/photos/brown-snake--6f9-eAybjA?utm_content=creditCopyText&utm_medium=referral&utm_source=unsplash][Unsplash]]
+
+Sometime a friendly snake can turn dangerous. Here are some hints to escape from
+Anaconda
+
+* Disclaimer
+The python code presented below was not developed for my current employer but in
+my free time so no copyright can be claimed from any company; I offer it as is
+with [[https://en.wikipedia.org/wiki/MIT_License][MIT license]] and no implied warranty of any kind.
 * Conda history and benefit
 Working with Python in Windows used to be difficult in the past (around years 2000-2010)
 - Python installer used to insert the latest version in the registry
@@ -16,12 +26,23 @@ worked better than pip when removing packages
 Recently the commercial licenses to access anaconda repo changed and my company
 decided to opt out, so we were suddenly looking for solutions to replace conda
 ** Alternative tools
-Since
+many more python tools are now available like
+- ~py.exe~ the python launcher for windows
+- ~uv~ a project management tool
+- ~poetry~ another project management tool
+- ~hatch~ ...
+All of these can be used together to replace what conda used to do as a package manager
 * Installing Python(s)
 ** Managing multiple installation in windows
+it is possible to download python installation from https://www.python.org/downloads/
+
+These are now installed in independent directories and can be accessed by using the python launcher ~py~
 #+begin_src bash
 py -3.6 --version
 #+end_src
+
+I find it convenient to create virtual environments with ~py~ and keep working
+from there, more details below
 ** Managing multiple installation in Linux
 I found very convenient to use [[https://docs.astral.sh/uv/][uv]] to manage different installation in a linux distribution
 - it's fast
@@ -63,17 +84,185 @@ or in linux
 uv run --python 3.8 -m venv myproject
 #+end_src
 ** Recovering dependencies from conda env
-*** Extracting full requirements from existing environment
-all dependencies
+this command will dump all of the dependencies, including those automatically added by conda
 #+begin_src bash
 conda env export --file myproject.yml
 #+end_src
-reduced dependecies
+
+in more recont versions of conda, with this command you can extract only those
+dependencies you added, in some cases this may be enough
 #+begin_src bash
 conda env export --from-history --file myproject_reduced.yml
 #+end_src
+** Modelling the translation
+I prefer to create clear models in order to make it easier to work with my data
+
+In this case I modelled a dependency with a package name and a list of
+constraints (which is the main PIP case)
+
+The Environment class models the conda environment, while the Requiments class
+models the requirements.txt
+#+begin_src python
+from typing import Union, List
+from dataclasses import dataclass
+
+@dataclass
+class Constr:
+    version: Union[List[int],str]
+    operator: str
+    def get_str_version(self):
+        if type(self.version) == str:
+            return self.version
+        else:
+            return ".".join([str(i) for i in self.version])
+
+@dataclass
+class Dep:
+    package: str
+    constraints: List[Constr]
+
+@dataclass
+class Environment:
+    name: str
+    deps: List[Dep]
+    prefix: str
+
+@dataclass
+class Requirements:
+    deps: List[Dep]
+#+end_src
+** Parsing the yaml
+First we read the yaml file using pyyaml library
+#+begin_src python
+import re
+from pathlib import Path
+from yaml import load, CLoader as Loader
+from typing import Union, List
+from .models import Constr, Dep, Environment
+
+def read(filename: Union[str,Path]):
+    with open(filename) as f:
+        base_dict = load(f, Loader)
+        deps = []
+        for dep in base_dict['dependencies']:
+            if type(dep) == str:
+                deps.append(parse_conda_dep(dep))
+            elif type(dep) == dict:
+                for pip_dep in dep['pip']:
+                    deps.append(parse_pip_dep(pip_dep))
+            else:
+                raise Exception(f"unknown dependency type '{dep}' : {type(dep)}")
+        return Environment(name=base_dict['name'],deps=deps,prefix=base_dict['prefix'])
+
+
+#+end_src
+
+then we extract the conda dependencies removing the hash code
+#+begin_src python
+CONDA_RE = re.compile(r"(?P<package>[^=]+)=(?P<version>[^=]+)")
+
+def parse_conda_dep(value: str):
+    matching = CONDA_RE.match(value)
+    assert matching is not None, f"cannot parse conda dependency {value}"
+    groups = matching.groupdict()
+    version=parse_version(groups['version'])
+    return Dep(
+        package=groups['package'],
+        constraints=[
+            Constr(
+                version=version,
+                operator='=='
+            )
+        ]
+    )
+
+
+#+end_src
+
+it may be convenient to have version numbers if any for future expansions
+#+begin_src python
+def parse_version(value: str):
+    try:
+        version = [int(i) for i in value.split('.')]
+    except ValueError:
+        version = value
+    return version
+
+#+end_src
+
+pip constraints are little different and may be multiple
+#+begin_src python
+PIP_RE = re.compile(r"(?P<package>[_A-Za-z0-9\-]+)(?P<constraints>.*)")
+PIP_CONSTRAINT = re.compile(r"(?P<operator>[=~\^><]+)(?P<version>.*)")
+
+def parse_pip_dep(value: str):
+    dep_matching = PIP_RE.match(value)
+    assert dep_matching is not None, f"cannot parse pip dependency {value}"
+    dep_groups = dep_matching.groupdict()
+    constraints = []
+    for c in dep_groups['constraints'].split(','):
+        constr_matching = PIP_CONSTRAINT.match(c)
+        assert constr_matching is not None, f"cannot parse pip constraint {c} in {value}"
+        constr_groups = constr_matching.groupdict()
+        version = parse_version(constr_groups['version'])
+        constraints.append(
+            Constr(
+                version = version,
+                operator = constr_groups['operator']
+            )
+        )
+    return Dep(
+        package = dep_groups['package'],
+        constraints = constraints
+    )
+#+end_src
+** Dumping the requirements
+This is the naive implementation to dump all requirements in a file
+
+Of course the transformation function may contain way more logic to generate
+more clever constraints than ~==~
+
+#+begin_src python
+from pathlib import Path
+from .models import Environment, Requirements
+from typing import Union
+
+def env_to_requirement(env: Environment):
+    return Requirements(deps=env.deps)
+
+def dump_requirements(reqs: Requirements):
+    for dep in reqs.deps:
+       yield "{}{}".format(
+           dep.package,
+           ",".join([
+               "{}{}".format(
+                   c.operator,
+                   c.get_str_version()
+               )
+               for c in dep.constraints
+           ])
+       )
+
+
+def write_requirements(reqs: Requirements, path: Union[str,Path]):
+    with open(path, mode="tw") as f:
+        for line in dump_requirements(reqs):
+            print(line,file=f)
+
+#+end_src
 * Packaging our own old dependencies
 ** Create a separate directory for dependencies
+I find it useful to separate the directory where I'm fixing my dependencies from
+the final environments; usually a parallel directory e.g. "repos"
+
+My directory layout looks like this now
+
+- envs
+  - myapp
+- repos
+  - mydep1
+  - mydep2
+
 ** Download from your repo
 #+begin_src bash
 git clone ssh://myserver/myproject-url.git
@@ -93,18 +282,36 @@ create a forked branch
 git checkout feature/myapp
 #+end_src
 ** Create a dedicated venv to build your package
+in windows
 #+begin_src bash
-py -3.6 -m venv init .
-Scripts/activate
+py -3.6 -m venv init .venv
+.venv\Scripts\activate
+#+end_src
+
+in linux
+#+begin_src bash
+uv run --python 3.8 python -m venv init .venv
+source .venv/bin/activate
 #+end_src
 ** Use Poetry to package your code
 also hatch can be used but I had some issues with dependencies on old projects
+
+in windows
 #+begin_src bash
 cd myproject
-Scripts/activate
+.venv\Scripts\activate.bat
 pip install poetry
 poetry init
 #+end_src
+
+in linux
+#+begin_src bash
+cd myproject
+source .venv/bin/activate
+pip install poetry
+poetry init
+#+end_src
+
 Here you can exactly create your version of the package so to satisfy the dependencies
 
 Also you are able to interactively choose which version of the dependent packages you want
@@ -115,18 +322,24 @@ now you may want to test your code
 poetry build
 #+end_src
 2. reactivate the app venv
+   in linux
    #+begin_src bash
-Scripts/deactivate
+deactivate
 cd ../../envs/myapp
-Scripts/activate
+source .venv/bin/activate
 pip install ../../deps/myproject/dist/myproject-0.1.0-py3-none-any.whl
    #+end_src
 ** Update repo
+finally let's update all into our base repo
 #+begin_src bash
 git add pyproject.toml
 git commit -m "packaged"
 git push --set-upstream origin feature/myapp
 #+end_src
-**
 
-* Updating a container
+* Conclusions
+this may be a very long and sensitive process, so additional care is needed to
+make sure that the new packages are working correctly.
+
+In future posts I will cover also how to update containers removing conda
+dependencies
