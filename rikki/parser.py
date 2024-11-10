@@ -1,25 +1,9 @@
 """parser library to read conda environment data"""
 import re
 from pathlib import Path
-from typing import Union, List
-from dataclasses import dataclass
 from yaml import load, CLoader as Loader
-
-@dataclass
-class Constr:
-    version: Union[List[int],str]
-    operator: str
-
-@dataclass
-class Dep:
-    package: str
-    constraints: [Constr]
-
-@dataclass
-class Environment:
-    name: str
-    deps: [Dep]
-    prefix: str
+from typing import Union, List
+from .models import Constr, Dep, Environment
 
 def read(filename: Union[str,Path]):
     with open(filename) as f:
