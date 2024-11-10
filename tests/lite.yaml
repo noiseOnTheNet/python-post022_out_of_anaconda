@@ -1,0 +1,6 @@
+name: lite
+channels:
+  - defaults
+dependencies:
+  - python=3.12
+prefix: /home/marco/miniconda3/envs/lite

@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "rikki"
+version = "0.1.0"
+description = "extract information from a conda env yaml into requirements.txt"
+authors = ["Marco Paolo Valerio Vezzoli <marco.p.v.vezzoli@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+PyYAML = "^6.0.2"
+tomli = "^2.0.2"
+tomli-w = "^1.1.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.3"
+pytest-coverage = "^0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

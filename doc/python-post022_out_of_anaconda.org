@@ -1,0 +1,132 @@
+#+title: Python Post022 Out Of Anaconda
+* Conda history and benefit
+Working with Python in Windows used to be difficult in the past (around years 2000-2010)
+- Python installer used to insert the latest version in the registry
+- people was trying to double-click python files with mixed results
+- managing multiple python installation was nearly impossible
+
+When I first started using some c-based python libraries in windows it was a real nightmare:
+- ABI incompatibility between visul-c compiled libraries and gnu-gcc
+- Compiling from source was not always a viable option
+- Wheel binary packages were not always available
+
+At that time the miniconda package manager was solving all of these issues and
+worked better than pip when removing packages
+
+Recently the commercial licenses to access anaconda repo changed and my company
+decided to opt out, so we were suddenly looking for solutions to replace conda
+** Alternative tools
+Since
+* Installing Python(s)
+** Managing multiple installation in windows
+#+begin_src bash
+py -3.6 --version
+#+end_src
+** Managing multiple installation in Linux
+I found very convenient to use [[https://docs.astral.sh/uv/][uv]] to manage different installation in a linux distribution
+- it's fast
+- it may be used for way more tasks
+
+Unfortunately today (november 2024) uv seems [[https://docs.astral.sh/uv/pip/compatibility/][not able to look at pip
+configuration files]] so I use it to bootstrap a virtual environment
+
+- to install uv execute the following command
+#+begin_src bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+#+end_src
+
+uv can install or find existing python installations with the "uv python" subcommand
+
+the ~run~ subcommand can be used to launch a specific project or python
+interpreter
+** Update PIP to the latest version
+
+sometime the default pip version is not updated; updating it will solve a lot of
+dependency issues: in windows
+#+begin_src bash
+py -3.6 python -m pip install --upgrade pip
+#+end_src
+
+in linux
+#+begin_src bash
+uv run --python 3.8 python -m pip install --upgrade pip
+#+end_src
+* Recover an old project
+** Create a virtualenv
+to properly connect your local interpreter and segregate packages: in windows
+#+begin_src bash
+py -3.6 -m venv init myproject
+#+end_src
+
+or in linux
+#+begin_src bash
+uv run --python 3.8 -m venv myproject
+#+end_src
+** Recovering dependencies from conda env
+*** Extracting full requirements from existing environment
+all dependencies
+#+begin_src bash
+conda env export --file myproject.yml
+#+end_src
+reduced dependecies
+#+begin_src bash
+conda env export --from-history --file myproject_reduced.yml
+#+end_src
+* Packaging our own old dependencies
+** Create a separate directory for dependencies
+** Download from your repo
+#+begin_src bash
+git clone ssh://myserver/myproject-url.git
+#+end_src
+** Reset to a specific version
+sometime you may need a version of your package which is not the latest one
+#+begin_src bash
+cd myproject
+git log -n 10 --oneline
+#+end_src
+this is going to list some versions
+#+begin_src bash
+git reset --hard abcd33d
+#+end_src
+create a forked branch
+#+begin_src bash
+git checkout feature/myapp
+#+end_src
+** Create a dedicated venv to build your package
+#+begin_src bash
+py -3.6 -m venv init .
+Scripts/activate
+#+end_src
+** Use Poetry to package your code
+also hatch can be used but I had some issues with dependencies on old projects
+#+begin_src bash
+cd myproject
+Scripts/activate
+pip install poetry
+poetry init
+#+end_src
+Here you can exactly create your version of the package so to satisfy the dependencies
+
+Also you are able to interactively choose which version of the dependent packages you want
+
+now you may want to test your code
+1. build a wheel
+#+begin_src bash
+poetry build
+#+end_src
+2. reactivate the app venv
+   #+begin_src bash
+Scripts/deactivate
+cd ../../envs/myapp
+Scripts/activate
+pip install ../../deps/myproject/dist/myproject-0.1.0-py3-none-any.whl
+   #+end_src
+** Update repo
+#+begin_src bash
+git add pyproject.toml
+git commit -m "packaged"
+git push --set-upstream origin feature/myapp
+#+end_src
+**
+
+* Updating a container
