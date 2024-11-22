@@ -19,7 +19,7 @@ def read(filename: Union[str,Path]):
                 raise Exception(f"unknown dependency type '{dep}' : {type(dep)}")
         return Environment(name=base_dict['name'],deps=deps,prefix=base_dict['prefix'])
 
-CONDA_RE = re.compile(r"(?P<package>[^=]+)=(?P<version>[^=]+)")
+CONDA_RE = re.compile(r"(?P<package>[^=]+)=+(?P<version>[^=]+)")
 
 def parse_conda_dep(value: str):
     matching = CONDA_RE.match(value)
